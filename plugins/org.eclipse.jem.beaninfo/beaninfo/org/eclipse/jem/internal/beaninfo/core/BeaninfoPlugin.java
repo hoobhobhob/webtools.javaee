@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2006 IBM Corporation and others.
+ * Copyright (c) 2001, 2026 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
  * which accompanies this distribution, and is available at
@@ -9,31 +9,46 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jem.internal.beaninfo.core;
-/*
 
-
- */
-
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 import org.eclipse.core.resources.IProject;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IConfigurationElement;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.ISafeRunnable;
+import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Plugin;
+import org.eclipse.core.runtime.SafeRunner;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.jdt.core.IClasspathContainer;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.osgi.service.resolver.PlatformAdmin;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
+import org.osgi.util.tracker.ServiceTracker;
 
 import org.eclipse.jem.internal.beaninfo.adapters.BeaninfoNature;
-import org.eclipse.jem.internal.proxy.core.*;
+import org.eclipse.jem.internal.proxy.core.ContainerPathContributionMapping;
 import org.eclipse.jem.internal.proxy.core.ContainerPathContributionMapping.ContainerContributionEntry;
+import org.eclipse.jem.internal.proxy.core.ContributorExtensionPointInfo;
+import org.eclipse.jem.internal.proxy.core.IConfigurationContributionInfo;
 import org.eclipse.jem.internal.proxy.core.IConfigurationContributionInfo.ContainerPaths;
+import org.eclipse.jem.internal.proxy.core.ProxyLaunchSupport;
+import org.eclipse.jem.internal.proxy.core.ProxyPlugin;
 import org.eclipse.jem.java.JavaClass;
 import org.eclipse.jem.util.logger.proxy.Logger;
 import org.eclipse.jem.util.logger.proxyrender.EclipseLogger;
@@ -49,6 +64,7 @@ public class BeaninfoPlugin extends Plugin {
 	public static final String PI_BEANINFO_OVERRIDES = "overrides";	// ID of the overrides extension point. //$NON-NLS-1$
 	
 	private static BeaninfoPlugin BEANINFO_PLUGIN = null;
+	private static ServiceTracker<PlatformAdmin, PlatformAdmin> platformTracker;
 		
 	public BeaninfoPlugin() {	
 		BEANINFO_PLUGIN = this;
@@ -61,6 +77,18 @@ public class BeaninfoPlugin extends Plugin {
 		return BEANINFO_PLUGIN;
 	}
 	
+	public static PlatformAdmin getPlatformAdmin() {
+		if (platformTracker == null) {
+			platformTracker = new ServiceTracker<>(getPlugin().getBundle().getBundleContext(), PlatformAdmin.class, null);
+			platformTracker.open();
+		}
+		if (platformTracker != null) {
+			PlatformAdmin service = platformTracker.getService();
+			return service;
+		}
+		return null;
+	}
+
 	/**
 	 * Special Override file name used when need to apply an override to a class that is at the root.
 	 * A root is one that doesn't have a super type. These are <code>java.lang.Object</code>, interfaces, and any
@@ -744,7 +772,10 @@ public class BeaninfoPlugin extends Plugin {
 				nature.shutdown();
 			}
 		}
-			
+		if (platformTracker != null) {
+			platformTracker.close();
+		}
+
 		super.stop(context);
 	}
 }

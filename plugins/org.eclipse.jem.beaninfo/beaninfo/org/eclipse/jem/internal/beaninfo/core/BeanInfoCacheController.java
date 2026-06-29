@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2005 IBM Corporation and others.
+ * Copyright (c) 2005, 2026 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials 
  * are made available under the terms of the Eclipse Public License v2.0
  * which accompanies this distribution, and is available at
@@ -8,10 +8,7 @@
  * Contributors:
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
-/*
 
-
- */
 package org.eclipse.jem.internal.beaninfo.core;
 
 import java.io.*;
@@ -887,7 +884,7 @@ public class BeanInfoCacheController {
 			cd = (ChangeDescription) cache;
 			for (Iterator iter = cd.getObjectChanges().iterator(); iter.hasNext();) {
 				EObjectToChangesMapEntryImpl fcEntry = (EObjectToChangesMapEntryImpl) iter.next();
-				if (((List) fcEntry.getValue()).isEmpty())
+				if (fcEntry.getValue().isEmpty())
 					iter.remove(); // Empty changes, remove it.
 			}
 		}
@@ -988,7 +985,7 @@ public class BeanInfoCacheController {
 					ce.setPendingOverrideResource(null);
 					ce.setOverrideCacheExists(false);
 				}
-				ce.setConfigurationModificationStamp(Platform.getPlatformAdmin().getState(false).getTimeStamp());
+				ce.setConfigurationModificationStamp(BeaninfoPlugin.getPlatformAdmin().getState(false).getTimeStamp());
 			}
 		}
 		queueClassEntry(ce, cacheRset); // Now queue it up.

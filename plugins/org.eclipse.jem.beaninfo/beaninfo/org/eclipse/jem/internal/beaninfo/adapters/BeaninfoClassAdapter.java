@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2006 IBM Corporation and others.
+ * Copyright (c) 2001, 2026 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
  * which accompanies this distribution, and is available at
@@ -9,42 +9,97 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jem.internal.beaninfo.adapters;
-/*
-
-
- */
 
 import java.io.FileNotFoundException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.text.MessageFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
-import org.eclipse.emf.common.notify.*;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IResourceStatus;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
+import org.eclipse.emf.common.notify.Adapter;
+import org.eclipse.emf.common.notify.Notification;
+import org.eclipse.emf.common.notify.Notifier;
 import org.eclipse.emf.common.notify.impl.AdapterImpl;
-import org.eclipse.emf.common.util.*;
-import org.eclipse.emf.ecore.*;
-import org.eclipse.emf.ecore.change.*;
+import org.eclipse.emf.common.util.BasicEList;
+import org.eclipse.emf.common.util.ECollections;
+import org.eclipse.emf.common.util.EList;
+import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.common.util.UniqueEList;
+import org.eclipse.emf.common.util.WrappedException;
+import org.eclipse.emf.ecore.EAnnotation;
+import org.eclipse.emf.ecore.EClassifier;
+import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.EOperation;
+import org.eclipse.emf.ecore.EReference;
+import org.eclipse.emf.ecore.EStructuralFeature;
+import org.eclipse.emf.ecore.EcoreFactory;
+import org.eclipse.emf.ecore.EcorePackage;
+import org.eclipse.emf.ecore.InternalEObject;
+import org.eclipse.emf.ecore.change.ChangeDescription;
+import org.eclipse.emf.ecore.change.ChangeFactory;
+import org.eclipse.emf.ecore.change.ChangePackage;
 import org.eclipse.emf.ecore.impl.ENotificationImpl;
 import org.eclipse.emf.ecore.impl.ESuperAdapter;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
-import org.eclipse.emf.ecore.util.*;
+import org.eclipse.emf.ecore.util.EcoreEList;
+import org.eclipse.emf.ecore.util.EcoreUtil;
+import org.eclipse.emf.ecore.util.InternalEList;
 import org.eclipse.emf.ecore.xmi.PackageNotFoundException;
 import org.eclipse.emf.ecore.xmi.XMIResource;
 
-import org.eclipse.jem.internal.beaninfo.*;
-import org.eclipse.jem.internal.beaninfo.common.*;
-import org.eclipse.jem.internal.beaninfo.core.*;
+import org.eclipse.jem.internal.beaninfo.BeanDecorator;
+import org.eclipse.jem.internal.beaninfo.BeanEvent;
+import org.eclipse.jem.internal.beaninfo.BeaninfoFactory;
+import org.eclipse.jem.internal.beaninfo.BeaninfoPackage;
+import org.eclipse.jem.internal.beaninfo.EventSetDecorator;
+import org.eclipse.jem.internal.beaninfo.ImplicitItem;
+import org.eclipse.jem.internal.beaninfo.IndexedPropertyDecorator;
+import org.eclipse.jem.internal.beaninfo.MethodDecorator;
+import org.eclipse.jem.internal.beaninfo.MethodProxy;
+import org.eclipse.jem.internal.beaninfo.PropertyDecorator;
+import org.eclipse.jem.internal.beaninfo.common.BeanRecord;
+import org.eclipse.jem.internal.beaninfo.common.EventSetRecord;
+import org.eclipse.jem.internal.beaninfo.common.IBeanInfoIntrospectionConstants;
+import org.eclipse.jem.internal.beaninfo.common.IndexedPropertyRecord;
+import org.eclipse.jem.internal.beaninfo.common.MethodRecord;
+import org.eclipse.jem.internal.beaninfo.common.PropertyRecord;
+import org.eclipse.jem.internal.beaninfo.core.BeanInfoCacheController;
 import org.eclipse.jem.internal.beaninfo.core.BeanInfoCacheController.ClassEntry;
+import org.eclipse.jem.internal.beaninfo.core.BeaninfoPlugin;
+import org.eclipse.jem.internal.beaninfo.core.Utilities;
 import org.eclipse.jem.internal.java.beaninfo.IIntrospectionAdapter;
-import org.eclipse.jem.internal.proxy.core.*;
-import org.eclipse.jem.java.*;
+import org.eclipse.jem.internal.proxy.core.IBeanProxy;
+import org.eclipse.jem.internal.proxy.core.IBeanTypeProxy;
+import org.eclipse.jem.internal.proxy.core.MapJNITypes;
+import org.eclipse.jem.internal.proxy.core.ProxyFactoryRegistry;
+import org.eclipse.jem.internal.proxy.core.ThrowableProxy;
+import org.eclipse.jem.java.ArrayType;
+import org.eclipse.jem.java.JavaClass;
+import org.eclipse.jem.java.JavaEvent;
+import org.eclipse.jem.java.JavaHelpers;
+import org.eclipse.jem.java.JavaParameter;
+import org.eclipse.jem.java.JavaRefFactory;
+import org.eclipse.jem.java.JavaRefPackage;
+import org.eclipse.jem.java.Method;
+import org.eclipse.jem.java.TypeKind;
 import org.eclipse.jem.java.internal.impl.JavaClassImpl;
 import org.eclipse.jem.util.TimerTests;
 import org.eclipse.jem.util.logger.proxy.Logger;
@@ -85,8 +140,7 @@ public class BeaninfoClassAdapter extends AdapterImpl implements IIntrospectionA
 	public static final String REMOTE_INTROSPECT = "Remote Introspect";	// Introspect on remote //$NON-NLS-1$
 	public static final String INTROSPECT = "Introspect";	// Straight introspection, whether load from cache or introspect. //$NON-NLS-1$
 	public static final String LOAD_FROM_CACHE = "Load from Cache"; //$NON-NLS-1$
-	
-	
+
 	public static BeaninfoClassAdapter getBeaninfoClassAdapter(EObject jc) {
 		return (BeaninfoClassAdapter) EcoreUtil.getExistingAdapter(jc, IIntrospectionAdapter.ADAPTER_KEY);
 	}
@@ -543,7 +597,8 @@ public class BeaninfoClassAdapter extends AdapterImpl implements IIntrospectionA
 				}
 			} else
 				return false;	// We don't have a cache entry to check against, which means are deleted, or never cached.
-			return classEntry.getConfigurationModificationStamp() == Platform.getPlatformAdmin().getState(false).getTimeStamp();
+			long pluginStateTimeStamp = BeaninfoPlugin.getPlatformAdmin().getState(false).getTimeStamp();
+			return classEntry.getConfigurationModificationStamp() == pluginStateTimeStamp;
 		}
 		
 	}
