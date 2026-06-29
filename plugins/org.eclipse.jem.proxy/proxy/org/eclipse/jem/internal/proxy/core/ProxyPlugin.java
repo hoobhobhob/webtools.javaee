@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2001, 2020 IBM Corporation and others.
+ * Copyright (c) 2001, 2026 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v2.0
  * which accompanies this distribution, and is available at
@@ -9,38 +9,73 @@
  *     IBM Corporation - initial API and implementation
  *******************************************************************************/
 package org.eclipse.jem.internal.proxy.core;
-/*
 
-
- */
-
-
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
-import org.eclipse.core.resources.*;
-import org.eclipse.core.runtime.*;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.FileLocator;
+import org.eclipse.core.runtime.IConfigurationElement;
+import org.eclipse.core.runtime.IExtension;
+import org.eclipse.core.runtime.IExtensionPoint;
+import org.eclipse.core.runtime.IPath;
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Plugin;
+import org.eclipse.core.runtime.QualifiedName;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.debug.core.*;
-import org.eclipse.jdt.core.*;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationListener;
+import org.eclipse.jdt.core.IClasspathContainer;
+import org.eclipse.jdt.core.IClasspathEntry;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaModel;
+import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 import org.eclipse.jdt.launching.JavaRuntime;
 import org.eclipse.osgi.service.resolver.BundleSpecification;
+import org.eclipse.osgi.service.resolver.PlatformAdmin;
 import org.eclipse.osgi.util.ManifestElement;
-import org.osgi.framework.*;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleEvent;
+import org.osgi.framework.BundleException;
+import org.osgi.framework.BundleListener;
+import org.osgi.framework.Constants;
+import org.osgi.util.tracker.ServiceTracker;
 
+import org.eclipse.jem.internal.proxy.core.IConfigurationContributionInfo.ContainerPaths;
 import org.eclipse.jem.util.logger.proxy.Logger;
 import org.eclipse.jem.util.logger.proxyrender.EclipseLogger;
 
-import org.eclipse.jem.internal.proxy.core.IConfigurationContributionInfo.ContainerPaths;
-
 /**
- * The plugin class for the org.eclipse.jem.internal.proxy.core plugin.
+ * The plugin class for the org.eclipse.jem.internal.proxy.core plug-in.
  */
 
 public class ProxyPlugin extends Plugin {
@@ -619,10 +654,10 @@ public class ProxyPlugin extends Plugin {
 	}
 	
 	public static Bundle[] getPrereqs(Bundle bundle) {
-		Bundle[] l = (Bundle[]) pluginRequiredMap.get(bundle.getSymbolicName());
+		Bundle[] l = pluginRequiredMap.get(bundle.getSymbolicName());
 		if (l == null) {
-			BundleSpecification specs[] = Platform.getPlatformAdmin().getState(false).getBundle(bundle.getBundleId()).getRequiredBundles();
-			ArrayList bundles = new ArrayList(specs.length);
+			BundleSpecification specs[] = getPlatformAdmin().getState(false).getBundle(bundle.getBundleId()).getRequiredBundles();
+			List<Bundle> bundles = new ArrayList<Bundle>(specs.length);
 			for (int i = 0; i < specs.length; i++) {
 				Bundle b = Platform.getBundle(specs[i].getName());
 				if (b != null)
@@ -798,6 +833,7 @@ public class ProxyPlugin extends Plugin {
 			}
 		}
 	};
+	private static ServiceTracker<PlatformAdmin, PlatformAdmin> platformTracker;
 	
 	private void startCleanupJob() {
 		cleanupJob.cancel();	// Stop what we are doing.
@@ -828,24 +864,36 @@ public class ProxyPlugin extends Plugin {
 				}
 			}
 		});
+		platformTracker = new ServiceTracker<>(context, PlatformAdmin.class, null);
+		platformTracker.open();
 		getPluginPreferences().setDefault(PREFERENCES_VM_NOVERIFY_KEY, true);
 	}
-	
+
+	static PlatformAdmin getPlatformAdmin() {
+		if (platformTracker != null) {
+			PlatformAdmin service = platformTracker.getService();
+			return service;
+		}
+		return null;
+	}
 
 	/* (non-Javadoc)
 	 * @see org.osgi.framework.BundleActivator#stop(org.osgi.framework.BundleContext)
 	 */
 	public void stop(BundleContext context) throws Exception {
-		// Handle case where debug plugin shuts down before we do since order not guarenteed.
+		// Handle case where debug plugin shuts down before we do since order not guaranteed.
 		if (DebugPlugin.getDefault() != null)
 			DebugPlugin.getDefault().getLaunchManager().removeLaunchConfigurationListener(launchListener);
-		cleanupJob.cancel();	// Stop what we are doing.		
+		if (platformTracker != null) {
+			platformTracker.close();
+		}
+		cleanupJob.cancel(); // Stop what we are doing.
 		if (shutdownListeners != null) {
 			Object[] listeners = shutdownListeners.getListeners();
 			for (int i = 0; i < listeners.length; i++) {
 				((IProxyPluginShutdownListener) listeners[i]).shutdown();
 			}
-		}		
+		}
 		super.stop(context);
 	}
 	
@@ -855,7 +903,7 @@ public class ProxyPlugin extends Plugin {
 	public static final String PI_PLUGIN = "plugin"; //$NON-NLS-1$
 	public static final String PI_CLASS = "class"; //$NON-NLS-1$
 	public static final String PI_REGISTRY_TYPE = "registryType";	//$NON-NLS-1$
-	public static final Map pluginRequiredMap = new HashMap(50);
+	public static final Map<String, Bundle[]> pluginRequiredMap = new HashMap<>(50);
 	
 	/*
 	 * Processed extension point info for contributors.
