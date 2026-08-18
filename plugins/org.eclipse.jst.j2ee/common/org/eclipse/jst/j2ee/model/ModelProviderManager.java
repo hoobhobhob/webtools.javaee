@@ -1,6 +1,6 @@
 /*
  * Licensed Material - Property of IBM
- * (C) Copyright IBM Corp. 2001, 2011 - All Rights Reserved.
+ * (C) Copyright IBM Corp. 2001, 2026 - All Rights Reserved.
  * US Government Users Restricted Rights - Use, duplication or disclosure
  * restricted by GSA ADP Schedule Contract with IBM Corp.
  */
@@ -343,12 +343,7 @@ protected static HashMap resourceSetListeners;
 		IProjectFacet facet = ProjectFacetsManager.getProjectFacet(type);
 		IFacetedProject fp = null;
 		try {
-			if (aModule.isBinary())
-			{
-				
-			}
-			else
-			{
+			if (!aModule.isBinary()) {
 				fp = ProjectFacetsManager.create(aModule.getProject());
 			}
 		} catch (CoreException e) {
