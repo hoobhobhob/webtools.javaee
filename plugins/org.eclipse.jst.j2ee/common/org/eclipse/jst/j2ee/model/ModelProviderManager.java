@@ -15,6 +15,7 @@ import java.util.WeakHashMap;
 
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.emf.common.notify.Adapter;
 import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.common.notify.impl.AdapterImpl;
@@ -96,11 +97,24 @@ protected static HashMap resourceSetListeners;
 			return factory.create(project);
 		}
 		
-		String errorMessage = J2EECommonMessages.getResourceString(
+		String infoMessage = J2EECommonMessages.getResourceString(
 				J2EECommonMessages.ERR_NO_MODEL_PROVIDER_FOR_PROJECT, new Object[] {project, vers});
-		Throwable error = new NullPointerException(errorMessage);
 		
-		J2EEPlugin.logError(error);
+		StringBuffer buffer = new StringBuffer();
+		buffer.append(infoMessage)
+			.append(System.lineSeparator());
+		
+		for ( StackTraceElement element : Thread.currentThread().getStackTrace()) {
+			buffer.append(element)
+			.append(System.lineSeparator());			
+		}
+		
+		J2EEPlugin.log(
+				J2EEPlugin.createStatus(
+						IStatus.INFO,
+						buffer.toString()
+						)
+				);
 				
 		return null;
 	}
@@ -121,11 +135,24 @@ protected static HashMap resourceSetListeners;
 			return mp;
 		}
 		
-		String errorMessage = J2EECommonMessages.getResourceString(
+		String infoMessage = J2EECommonMessages.getResourceString(
 				J2EECommonMessages.ERR_NO_MODEL_PROVIDER_FOR_PROJECT, new Object[] {aModule, vers});
-		Throwable error = new NullPointerException(errorMessage);
 		
-		J2EEPlugin.logError(error);
+		StringBuffer buffer = new StringBuffer();
+		buffer.append(infoMessage)
+			.append(System.lineSeparator());
+		
+		for ( StackTraceElement element : Thread.currentThread().getStackTrace()) {
+			buffer.append(element)
+			.append(System.lineSeparator());			
+		}
+		
+		J2EEPlugin.log(
+				J2EEPlugin.createStatus(
+						IStatus.INFO,
+						buffer.toString()
+						)
+				);
 		
 		return null;
 	}
